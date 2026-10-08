@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import "./style.css";
 
-const API_ROOT = "https://feature-independence-backend.onrender.com"; 
+const API_ROOT = "https://feature-independence-analysis-b9n3.onrender.com";
 
 async function getApiError(response) {
   try {
