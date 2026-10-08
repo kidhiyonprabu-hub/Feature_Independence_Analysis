@@ -30,6 +30,9 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 async def read_csv_upload(file: UploadFile) -> tuple[pd.DataFrame, bytes]:
