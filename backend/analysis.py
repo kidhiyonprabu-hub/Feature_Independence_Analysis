@@ -1,5 +1,7 @@
+import math
+
 import pandas as pd
-from scipy.stats import chi2_contingency
+from scipy.stats import chi2_contingency, chisquare
 
 
 def is_identifier(column: str, data: pd.DataFrame) -> bool:
@@ -112,4 +114,114 @@ def build_contingency_tables(
         "column_labels": [str(value) for value in observed.columns],
         "observed": observed.values.tolist(),
         "expected": expected.tolist(),
+    }
+
+
+def perform_goodness_of_fit_test(
+    categories: list[str],
+    observed: list[float],
+    expected_mode: str = "equal",
+    expected_values: list[float] | None = None,
+) -> dict[str, object]:
+    if len(categories) < 2:
+        raise ValueError("Enter at least two categories.")
+    if any(not isinstance(category, str) or not category.strip() for category in categories):
+        raise ValueError("Category names must not be empty.")
+
+    normalized_categories = [category.strip() for category in categories]
+    if len(set(normalized_categories)) != len(normalized_categories):
+        raise ValueError("Category names must be unique.")
+    if len(observed) != len(normalized_categories):
+        raise ValueError("Enter one observed frequency for each category.")
+
+    def validated_values(values: list[float], label: str) -> list[float]:
+        parsed = []
+        for value in values:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"{label} must contain numeric values.")
+            try:
+                numeric_value = float(value)
+            except OverflowError as error:
+                raise ValueError(f"{label} must contain finite values.") from error
+            if not math.isfinite(numeric_value):
+                raise ValueError(f"{label} must contain finite values.")
+            if numeric_value < 0:
+                raise ValueError(f"{label} must be non-negative.")
+            parsed.append(numeric_value)
+        return parsed
+
+    observed_values = validated_values(observed, "Observed frequencies")
+    observed_total = sum(observed_values)
+    if not math.isfinite(observed_total):
+        raise ValueError("Observed frequencies must have a finite total.")
+    if observed_total <= 0:
+        raise ValueError("The observed frequencies must have a positive total.")
+
+    if expected_mode == "equal":
+        expected_frequencies = [observed_total / len(normalized_categories)] * len(
+            normalized_categories
+        )
+    elif expected_mode in {"frequencies", "proportions"}:
+        if expected_values is None:
+            raise ValueError("Enter expected values for every category.")
+        if len(expected_values) != len(normalized_categories):
+            raise ValueError("Enter one expected value for each category.")
+        values = validated_values(expected_values, "Expected values")
+        if expected_mode == "frequencies":
+            expected_total = sum(values)
+            if not math.isfinite(expected_total):
+                raise ValueError("Expected frequencies must have a finite total.")
+            if not math.isclose(
+                expected_total, observed_total, rel_tol=1e-8, abs_tol=1e-8
+            ):
+                raise ValueError(
+                    "Expected frequencies must sum to the observed total."
+                )
+            expected_frequencies = values
+        else:
+            proportions_total = sum(values)
+            if not math.isfinite(proportions_total):
+                raise ValueError("Expected proportions must have a finite total.")
+            if not math.isclose(
+                proportions_total, 1.0, rel_tol=1e-8, abs_tol=1e-8
+            ):
+                raise ValueError("Expected proportions must sum to 1.")
+            expected_frequencies = [value * observed_total for value in values]
+    else:
+        raise ValueError(
+            "Expected mode must be equal, frequencies, or proportions."
+        )
+
+    if any(value <= 0 for value in expected_frequencies):
+        raise ValueError("Expected frequencies must be greater than zero.")
+    if any(value < 5 for value in expected_frequencies):
+        raise ValueError(
+            "Each expected frequency must be at least 5 for the Chi-Square approximation."
+        )
+
+    statistic, p_value = chisquare(
+        f_obs=observed_values,
+        f_exp=expected_frequencies,
+    )
+    alpha = 0.05
+    significant = bool(p_value < alpha)
+    conclusion = (
+        "Reject the null hypothesis: the observed frequencies differ significantly "
+        "from the expected distribution."
+        if significant
+        else "Fail to reject the null hypothesis: there is not enough evidence that "
+        "the observed frequencies differ from the expected distribution."
+    )
+
+    return {
+        "categories": normalized_categories,
+        "observed": observed_values,
+        "expected": expected_frequencies,
+        "chi_square": float(statistic),
+        "degrees_of_freedom": len(normalized_categories) - 1,
+        "p_value": float(p_value),
+        "alpha": alpha,
+        "significant": significant,
+        "conclusion": conclusion,
+        "expected_mode": expected_mode,
     }

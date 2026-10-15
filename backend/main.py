@@ -13,6 +13,7 @@ from backend.analysis import (
     build_contingency_tables,
     is_categorical_column,
     is_identifier,
+    perform_goodness_of_fit_test,
 )
 
 
@@ -233,6 +234,60 @@ async def analyze_csv(
         ),
         "results": rows,
     }
+
+
+@app.post("/api/goodness-of-fit")
+async def goodness_of_fit(
+    categories: str = Form(...),
+    observed_frequencies: str = Form(...),
+    expected_mode: str = Form("equal"),
+    expected_values: str | None = Form(None),
+) -> dict[str, object]:
+    try:
+        parsed_categories = json.loads(categories)
+        parsed_observed = json.loads(observed_frequencies)
+        parsed_expected = (
+            json.loads(expected_values) if expected_values is not None else None
+        )
+    except json.JSONDecodeError as error:
+        raise HTTPException(
+            status_code=400,
+            detail="Categories and frequencies must be JSON arrays.",
+        ) from error
+
+    if (
+        not isinstance(parsed_categories, list)
+        or not all(isinstance(category, str) for category in parsed_categories)
+        or not isinstance(parsed_observed, list)
+        or not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            for value in parsed_observed
+        )
+        or (
+            parsed_expected is not None
+            and (
+                not isinstance(parsed_expected, list)
+                or not all(
+                    isinstance(value, (int, float)) and not isinstance(value, bool)
+                    for value in parsed_expected
+                )
+            )
+        )
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Categories and frequencies must be arrays of names and numbers.",
+        )
+
+    try:
+        return perform_goodness_of_fit_test(
+            parsed_categories,
+            parsed_observed,
+            expected_mode,
+            parsed_expected,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 if FRONTEND_DIST.exists():

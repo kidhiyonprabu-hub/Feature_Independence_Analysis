@@ -468,3 +468,57 @@ a { color: inherit; text-decoration: none; }
   .insight-card { padding: 11px; }
   .insight-card p { font-size: 9px; }
 }
+
+.test-type-select { display: flex; max-width: 470px; flex-direction: column; gap: 6px; margin-top: 24px; color: #62677a; font-size: 10px; font-weight: 700; }
+.test-type-select select, .goodness-mode-row select { height: 38px; padding: 0 10px; border: 1px solid #e5e6ee; border-radius: 7px; outline: none; color: #4c5063; background: #fff; font-size: 10px; }
+.test-type-select select:focus, .goodness-mode-row select:focus, .goodness-input-row input:focus { border-color: #9a91eb; box-shadow: 0 0 0 3px #6d5ede16; }
+.goodness-section { margin-top: 23px; }
+.goodness-form { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.goodness-mode-row { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 15px; }
+.goodness-mode-row label { display: flex; min-width: min(100%, 260px); flex-direction: column; gap: 6px; color: #62677a; font-size: 9px; font-weight: 700; }
+.goodness-mode-row select { width: 100%; }
+.goodness-mode-row p { margin: 0 0 10px; color: #9297a8; font-size: 9px; }
+.goodness-input-header, .goodness-input-row { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(130px, 1fr) 34px; align-items: center; gap: 10px; }
+.goodness-input-header.has-expected, .goodness-input-row.has-expected { grid-template-columns: minmax(140px, 1.2fr) minmax(120px, 1fr) minmax(120px, 1fr) 34px; }
+.goodness-input-header { padding: 0 2px 7px; color: #858a9c; font-size: 8px; font-weight: 700; }
+.goodness-input-row { margin-top: 7px; }
+.goodness-input-row input { width: 100%; height: 35px; padding: 0 9px; border: 1px solid #e5e6ee; border-radius: 6px; outline: none; color: #4c5063; background: #fff; font-size: 10px; }
+.goodness-input-row input[type="number"] { font-variant-numeric: tabular-nums; }
+.goodness-input-row .icon-button:disabled { cursor: not-allowed; opacity: .35; }
+.goodness-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding-top: 8px; border-top: 1px solid #eff0f4; }
+.goodness-actions .analyze-button { margin-top: 0; }
+.goodness-results { margin-top: 27px; }
+.goodness-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
+.goodness-result-grid { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(300px, 1.15fr); gap: 12px; }
+.goodness-table-card, .goodness-chart-card { min-width: 0; }
+.goodness-table { white-space: normal; }
+.goodness-chart { padding: 12px 15px 15px; }
+.goodness-chart-legend { display: flex; gap: 14px; margin-bottom: 12px; color: #858a9c; font-size: 8px; }
+.goodness-chart-legend span { display: flex; align-items: center; gap: 5px; }
+.goodness-chart-legend i { width: 9px; height: 9px; border-radius: 2px; }
+.observed-bar { background: #7063df; }
+.expected-bar { background: #20a987; }
+.goodness-chart-row { display: grid; grid-template-columns: minmax(70px, .6fr) minmax(120px, 1fr); align-items: center; gap: 10px; margin-top: 10px; }
+.goodness-chart-label { overflow: hidden; color: #666b7e; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.goodness-bars { display: flex; flex-direction: column; gap: 4px; }
+.goodness-bar-track { height: 8px; overflow: hidden; border-radius: 5px; background: #f0f1f6; }
+.goodness-bar-track i { display: block; height: 100%; min-width: 0; border-radius: inherit; }
+.goodness-results .insight-card { margin-top: 13px; }
+.goodness-results .method-note { margin-top: 11px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+
+@media (max-width: 850px) {
+  .goodness-result-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .goodness-mode-row { align-items: stretch; flex-direction: column; gap: 8px; }
+  .goodness-mode-row p { margin-bottom: 0; }
+  .goodness-input-header, .goodness-input-row { grid-template-columns: minmax(90px, 1fr) minmax(90px, 1fr) 30px; gap: 6px; }
+  .goodness-input-header.has-expected, .goodness-input-row.has-expected { grid-template-columns: repeat(3, minmax(70px, 1fr)) 28px; }
+  .goodness-form { padding: 12px 9px; }
+  .goodness-input-row input { padding: 0 6px; font-size: 9px; }
+  .goodness-actions { align-items: stretch; flex-direction: column; }
+  .goodness-actions .analyze-button { width: 100%; }
+  .goodness-metrics { grid-template-columns: 1fr; }
+  .test-type-select { max-width: none; }
+}

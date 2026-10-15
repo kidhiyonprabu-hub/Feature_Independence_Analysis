@@ -41,6 +41,21 @@ class CategoricalAnalysisTests(unittest.TestCase):
         self.assertEqual(results.iloc[0]["Rows excluded"], 0)
         self.assertTrue(results.iloc[0]["Test reliable"])
 
+    def test_independence_test_keeps_known_balanced_table_result(self) -> None:
+        independent_data = pd.DataFrame(
+            {
+                "feature": ["A"] * 20 + ["B"] * 20,
+                "target": ["X"] * 10 + ["Y"] * 10 + ["X"] * 10 + ["Y"] * 10,
+            }
+        )
+
+        result = analyze_features(independent_data, "target", ["feature"])
+
+        self.assertEqual(result.iloc[0]["Chi-Square"], 0.0)
+        self.assertEqual(result.iloc[0]["p-value"], 1.0)
+        self.assertEqual(result.iloc[0]["Degrees of freedom"], 1)
+        self.assertEqual(result.iloc[0]["Result"], "Not significant")
+
     def test_bias_corrected_cramers_v_does_not_overstate_small_samples(self) -> None:
         small_data = pd.DataFrame(
             {"feature": ["A", "A", "B", "B"], "target": ["X", "Y", "X", "Y"]}

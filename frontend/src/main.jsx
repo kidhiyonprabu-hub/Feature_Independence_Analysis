@@ -24,7 +24,12 @@ import {
 } from "lucide-react";
 import "./style.css";
 
-const API_ROOT = "https://feature-independence-analysis-b9n3.onrender.com";
+const API_ROOT =
+  import.meta.env.VITE_API_ROOT ??
+  (import.meta.env.DEV ||
+  ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    ? "http://127.0.0.1:8000"
+    : "https://feature-independence-analysis-b9n3.onrender.com");
 
 async function getApiError(response) {
   try {
@@ -41,6 +46,7 @@ function formatPValue(value) {
 }
 
 function App() {
+  const [testType, setTestType] = useState("independence");
   const [apiStatus, setApiStatus] = useState("checking");
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState(null);
@@ -475,6 +481,27 @@ function App() {
             </div>
           )}
 
+          <label className="test-type-select">
+            <span>Test type</span>
+            <select
+              value={testType}
+              onChange={(event) => {
+                setTestType(event.target.value);
+                setAnalysis(null);
+                setError("");
+              }}
+            >
+              <option value="independence">
+                Chi-Square Test of Independence
+              </option>
+              <option value="goodness-of-fit">
+                Chi-Square Goodness of Fit Test
+              </option>
+            </select>
+          </label>
+
+          {testType === "independence" ? (
+            <>
           <section className="section-block" id="upload">
             <div className="section-heading">
               <div>
@@ -1270,6 +1297,10 @@ function App() {
               <ArrowUpRight size={17} />
             </div>
           )}
+            </>
+          ) : (
+            <GoodnessOfFitStudio />
+          )}
 
           <footer className="page-footer">
             <span>
@@ -1284,6 +1315,400 @@ function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+function GoodnessOfFitStudio() {
+  const [rows, setRows] = useState([
+    { category: "Maths", observed: "20", expected: "25", proportion: "0.25" },
+    { category: "Science", observed: "30", expected: "25", proportion: "0.25" },
+    { category: "English", observed: "25", expected: "25", proportion: "0.25" },
+    { category: "Computer", observed: "25", expected: "25", proportion: "0.25" },
+  ]);
+  const [expectedMode, setExpectedMode] = useState("equal");
+  const [result, setResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  function updateRow(index, key, value) {
+    setRows((current) =>
+      current.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [key]: value } : row,
+      ),
+    );
+    setResult(null);
+  }
+
+  async function runTest(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setResult(null);
+
+    const body = new FormData();
+    body.append("categories", JSON.stringify(rows.map((row) => row.category)));
+    body.append(
+      "observed_frequencies",
+      JSON.stringify(rows.map((row) => Number(row.observed))),
+    );
+    body.append("expected_mode", expectedMode);
+    if (expectedMode === "frequencies" || expectedMode === "proportions") {
+      body.append(
+        "expected_values",
+        JSON.stringify(
+          rows.map((row) =>
+            Number(
+              expectedMode === "frequencies"
+                ? row.expected
+                : row.proportion,
+            ),
+          ),
+        ),
+      );
+    }
+
+    try {
+      const response = await fetch(`${API_ROOT}/api/goodness-of-fit`, {
+        method: "POST",
+        body,
+      });
+      if (!response.ok) throw new Error(await getApiError(response));
+      setResult(await response.json());
+    } catch (testError) {
+      setError(testError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const maximumFrequency = result
+    ? Math.max(1, ...result.observed, ...result.expected)
+    : 1;
+
+  return (
+    <section className="section-block goodness-section">
+      <div className="section-heading">
+        <div>
+          <div className="step-label">
+            <span>01</span> DEFINE YOUR DISTRIBUTION
+          </div>
+          <h2>Chi-Square Goodness of Fit</h2>
+          <p>
+            Compare observed counts with expected category frequencies.
+            Expected counts must be at least 5.
+          </p>
+        </div>
+      </div>
+
+      {error && (
+        <div className="error-banner" role="alert">
+          <X size={17} />
+          <span>{error}</span>
+          <button
+            type="button"
+            aria-label="Dismiss error"
+            onClick={() => setError("")}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      <form className="goodness-form" onSubmit={runTest}>
+        <div className="goodness-mode-row">
+          <label>
+            <span>Expected distribution</span>
+            <select
+              value={expectedMode}
+              onChange={(event) => {
+                setExpectedMode(event.target.value);
+                setResult(null);
+              }}
+            >
+              <option value="equal">Equal distribution</option>
+              <option value="frequencies">Expected frequencies</option>
+              <option value="proportions">Expected proportions</option>
+            </select>
+          </label>
+          {expectedMode === "proportions" && (
+            <p>Expected proportions must add up to 1.</p>
+          )}
+          {expectedMode === "frequencies" && (
+            <p>Expected frequencies must add up to the observed total.</p>
+          )}
+        </div>
+
+        <div className="goodness-input-table">
+          <div
+            className={`goodness-input-header ${
+              expectedMode !== "equal" ? "has-expected" : ""
+            }`}
+          >
+            <span>Category name</span>
+            <span>Observed frequency</span>
+            {expectedMode === "frequencies" && (
+              <span>Expected frequency</span>
+            )}
+            {expectedMode === "proportions" && (
+              <span>Expected proportion</span>
+            )}
+            <span aria-hidden="true" />
+          </div>
+          {rows.map((row, index) => (
+            <div
+              className={`goodness-input-row ${
+                expectedMode !== "equal" ? "has-expected" : ""
+              }`}
+              key={index}
+            >
+              <label>
+                <span className="sr-only">Category {index + 1} name</span>
+                <input
+                  value={row.category}
+                  onChange={(event) =>
+                    updateRow(index, "category", event.target.value)
+                  }
+                  placeholder="Category name"
+                  required
+                />
+              </label>
+              <label>
+                <span className="sr-only">
+                  Observed frequency for {row.category || `category ${index + 1}`}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={row.observed}
+                  onChange={(event) =>
+                    updateRow(index, "observed", event.target.value)
+                  }
+                  required
+                />
+              </label>
+              {expectedMode === "frequencies" && (
+                <label>
+                  <span className="sr-only">
+                    Expected frequency for{" "}
+                    {row.category || `category ${index + 1}`}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={row.expected}
+                    onChange={(event) =>
+                      updateRow(index, "expected", event.target.value)
+                    }
+                    required
+                  />
+                </label>
+              )}
+              {expectedMode === "proportions" && (
+                <label>
+                  <span className="sr-only">
+                    Expected proportion for{" "}
+                    {row.category || `category ${index + 1}`}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="any"
+                    value={row.proportion}
+                    onChange={(event) =>
+                      updateRow(index, "proportion", event.target.value)
+                    }
+                    required
+                  />
+                </label>
+              )}
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={`Remove ${row.category || `category ${index + 1}`}`}
+                disabled={rows.length <= 2}
+                onClick={() => {
+                  setRows((current) =>
+                    current.filter((_, rowIndex) => rowIndex !== index),
+                  );
+                  setResult(null);
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="goodness-actions">
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => {
+              setRows((current) => [
+                ...current,
+                { category: "", observed: "", expected: "", proportion: "" },
+              ]);
+              setResult(null);
+            }}
+          >
+            + Add category
+          </button>
+          <button
+            className="analyze-button"
+            type="submit"
+            disabled={busy}
+          >
+            {busy ? (
+              <LoaderCircle className="spin" size={17} />
+            ) : (
+              <Sparkles size={17} />
+            )}
+            {busy ? "Calculating…" : "Run goodness-of-fit test"}
+            {!busy && <ArrowRight size={17} />}
+          </button>
+        </div>
+      </form>
+
+      {result && (
+        <section className="goodness-results" aria-live="polite">
+          <div className="section-heading">
+            <div>
+              <div className="step-label">
+                <span>02</span> TEST RESULTS
+              </div>
+              <h2>Observed vs expected</h2>
+            </div>
+          </div>
+
+          <div className="goodness-metrics">
+            <MetricCard
+              label="Chi-Square statistic"
+              value={result.chi_square.toFixed(3)}
+              detail="Goodness-of-fit statistic"
+              icon={<Activity size={17} />}
+            />
+            <MetricCard
+              label="Degrees of freedom"
+              value={result.degrees_of_freedom}
+              detail="Categories minus one"
+              icon={<BarChart3 size={17} />}
+            />
+            <MetricCard
+              label="P-value"
+              value={formatPValue(result.p_value)}
+              detail={`Alpha = ${result.alpha.toFixed(2)}`}
+              icon={<Sparkles size={17} />}
+              accent
+            />
+          </div>
+
+          <div className="goodness-result-grid">
+            <div className="results-card goodness-table-card">
+              <div className="card-heading results-card-heading">
+                <div>
+                  <span className="heading-icon">
+                    <Database size={16} />
+                  </span>
+                  <strong>Observed vs expected frequencies</strong>
+                </div>
+              </div>
+              <div className="table-scroll">
+                <table className="data-table goodness-table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Observed</th>
+                      <th>Expected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.categories.map((category, index) => (
+                      <tr key={category}>
+                        <th>{category}</th>
+                        <td>{result.observed[index]}</td>
+                        <td>{result.expected[index].toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="results-card goodness-chart-card">
+              <div className="card-heading results-card-heading">
+                <div>
+                  <span className="heading-icon">
+                    <BarChart3 size={16} />
+                  </span>
+                  <strong>Frequency comparison</strong>
+                </div>
+              </div>
+              <div className="goodness-chart">
+                <div className="goodness-chart-legend">
+                  <span><i className="observed-bar" /> Observed</span>
+                  <span><i className="expected-bar" /> Expected</span>
+                </div>
+                {result.categories.map((category, index) => (
+                  <div className="goodness-chart-row" key={category}>
+                    <span className="goodness-chart-label">{category}</span>
+                    <div className="goodness-bars">
+                      <div className="goodness-bar-track">
+                        <i
+                          className="observed-bar"
+                          style={{
+                            width: `${(result.observed[index] / maximumFrequency) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="goodness-bar-track">
+                        <i
+                          className="expected-bar"
+                          style={{
+                            width: `${(result.expected[index] / maximumFrequency) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={`insight-card ${
+              result.significant ? "insight-caution" : ""
+            }`}
+            role="status"
+          >
+            <span className="insight-icon">
+              <Sparkles size={17} />
+            </span>
+            <div>
+              <strong>
+                {result.significant
+                  ? "Statistically significant difference"
+                  : "No statistically significant difference"}
+              </strong>
+              <p>{result.conclusion}</p>
+            </div>
+          </div>
+          <div className="method-note">
+            <CircleHelp size={15} />
+            <span>
+              <strong>How to read this:</strong> the null hypothesis is that
+              observed frequencies follow the expected distribution. A
+              p-value below alpha ({result.alpha.toFixed(2)}) is evidence
+              against that hypothesis; it does not establish why the
+              frequencies differ.
+            </span>
+          </div>
+        </section>
+      )}
+    </section>
   );
 }
 

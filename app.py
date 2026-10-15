@@ -3,7 +3,12 @@ import pandas as pd
 import streamlit as st
 from scipy.stats import chi2_contingency
 
-from backend.analysis import analyze_features, is_categorical_column, is_identifier
+from backend.analysis import (
+    analyze_features,
+    is_categorical_column,
+    is_identifier,
+    perform_goodness_of_fit_test,
+)
 
 
 st.set_page_config(
@@ -56,11 +61,139 @@ st.markdown(
     """
     <div class="hero">
       <h1>📊 Feature Independence Analysis</h1>
-      <p>Explore relationships between categorical features and a target using the Chi-Square test.</p>
+      <p>Test categorical features for independence or compare observed counts with an expected distribution.</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
+
+test_type = st.radio(
+    "Test Type",
+    (
+        "Chi-Square Test of Independence",
+        "Chi-Square Goodness of Fit Test",
+    ),
+    horizontal=True,
+)
+
+if test_type == "Chi-Square Goodness of Fit Test":
+    st.subheader("Chi-Square Goodness of Fit")
+    st.caption(
+        "Compare observed category counts with an expected distribution. "
+        "Each expected frequency must be at least 5."
+    )
+    with st.form("goodness_of_fit_form"):
+        category_text = st.text_input(
+            "Category names (comma-separated)",
+            "Maths, Science, English, Computer",
+        )
+        observed_text = st.text_input(
+            "Observed frequencies (comma-separated)",
+            "20, 30, 25, 25",
+        )
+        expected_mode = st.selectbox(
+            "Expected distribution",
+            ("equal", "frequencies", "proportions"),
+            format_func={
+                "equal": "Equal distribution",
+                "frequencies": "Expected frequencies",
+                "proportions": "Expected proportions",
+            }.get,
+        )
+        expected_text = ""
+        if expected_mode == "frequencies":
+            expected_text = st.text_input(
+                "Expected frequencies (comma-separated)",
+                "25, 25, 25, 25",
+            )
+        elif expected_mode == "proportions":
+            expected_text = st.text_input(
+                "Expected proportions (comma-separated; must sum to 1)",
+                "0.25, 0.25, 0.25, 0.25",
+            )
+        run_goodness_of_fit = st.form_submit_button("Run goodness-of-fit test")
+
+    if run_goodness_of_fit:
+        try:
+            categories = [value.strip() for value in category_text.split(",")]
+            observed_frequencies = [
+                float(value.strip()) for value in observed_text.split(",")
+            ]
+            expected_values = (
+                [float(value.strip()) for value in expected_text.split(",")]
+                if expected_mode != "equal"
+                else None
+            )
+            goodness_result = perform_goodness_of_fit_test(
+                categories,
+                observed_frequencies,
+                expected_mode,
+                expected_values,
+            )
+        except ValueError as error:
+            st.error(f"Invalid input: {error}")
+        else:
+            st.dataframe(
+                pd.DataFrame(
+                    {
+                        "Category": goodness_result["categories"],
+                        "Observed": goodness_result["observed"],
+                        "Expected": goodness_result["expected"],
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+            )
+            metric_columns = st.columns(4)
+            metric_columns[0].metric(
+                "Chi-Square statistic", f"{goodness_result['chi_square']:.3f}"
+            )
+            metric_columns[1].metric(
+                "Degrees of freedom", goodness_result["degrees_of_freedom"]
+            )
+            metric_columns[2].metric(
+                "P-value", f"{goodness_result['p_value']:.4g}"
+            )
+            metric_columns[3].metric("Significance level (alpha)", "0.05")
+
+            categories = goodness_result["categories"]
+            observed_frequencies = goodness_result["observed"]
+            expected_frequencies = goodness_result["expected"]
+            positions = list(range(len(categories)))
+            bar_width = 0.38
+            figure, axis = plt.subplots(figsize=(9, 4))
+            axis.bar(
+                [position - bar_width / 2 for position in positions],
+                observed_frequencies,
+                bar_width,
+                label="Observed",
+                color="#6875e8",
+            )
+            axis.bar(
+                [position + bar_width / 2 for position in positions],
+                expected_frequencies,
+                bar_width,
+                label="Expected",
+                color="#16a085",
+            )
+            axis.set_xticks(positions, categories)
+            axis.set_ylabel("Frequency")
+            axis.set_title("Observed vs expected frequencies")
+            axis.legend()
+            figure.patch.set_facecolor("#f6f8ff")
+            axis.set_facecolor("#f6f8ff")
+            figure.tight_layout()
+            st.pyplot(figure, width="stretch")
+            plt.close(figure)
+
+            if goodness_result["significant"]:
+                st.success(goodness_result["conclusion"])
+            else:
+                st.info(goodness_result["conclusion"])
+            st.caption(
+                "Null hypothesis: the category frequencies follow the specified expected distribution."
+            )
+    st.stop()
 
 
 def show_association_chart(results: pd.DataFrame) -> None:
